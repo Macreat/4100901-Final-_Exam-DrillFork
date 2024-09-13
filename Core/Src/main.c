@@ -21,6 +21,13 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <string.h> //
+#include "keypad.h" //
+
+
+#include "ring_buffer.h"
+#include"ssd1306.h"
+#include"ssd1306_fonts.h"
 #include <stdio.h>
 /* USER CODE END Includes */
 
@@ -40,9 +47,35 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef hi2c1;
+
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+uint8_t data_usart2;
+uint8_t newline[] = "\r\n";
+
+#define BUFFER_CAPACITY 10
+uint8_t keyboard_buffer_memory[BUFFER_CAPACITY];
+ring_buffer_t keyboard_ring_buffer;
+uint8_t first_key_pressed = 0;
+uint8_t cursor_x_position = 10;
+uint8_t cursor_y_position = 30;
+uint8_t max_cursor_x_position = 80;
+
+#define MAX_DISPLAY_CHARS 20 // SIZE of chart and screen
+
+//buffer to store the key sequence
+static char display_buffer[MAX_DISPLAY_CHARS + 1]; // +1 for nule value
+static uint8_t buffer_index = 0;
+
+// variables for actual cursor position on screen
+static uint8_t cursor_x = 10;
+static uint8_t cursor_y = 30;
+// adding variables for LED control
+#define SYSTEM_LED_GPIO_Port GPIOA
+#define SYSTEM_LED_Pin GPIO_PIN_5
+
 
 /* USER CODE END PV */
 
@@ -50,12 +83,36 @@ UART_HandleTypeDef huart2;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_I2C1_Init(void);
+void clear_line(uint8_t y_position);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+/*
+ * Function to redirect printf output to UART.
+ *
+ * Purpose:
+ * This function overrides the standard `_write` function to allow the
+ * usage of `printf` in embedded systems without a standard output. It
+ * redirects the printf output to UART for debugging or serial communication.
+ *
+ * Parameters:
+ * - file: Not used, required by the function signature.
+ * - ptr: Pointer to the data to be transmitted.
+ * - len: Length of the data to be transmitted.
+ *
+ * Functionality:
+ * - It sends the data pointed to by `ptr` via UART using HAL_UART_Transmit.
+ * - It returns the length of the data transmitted.
+ *
+ * Use case:
+ * By using this function, any call to `printf` will output the message
+ * to the UART interface, which can be monitored with a serial console.
+ */
+
 int _write(int file, char *ptr, int len)
 {
   // to using printf
@@ -63,10 +120,14 @@ int _write(int file, char *ptr, int len)
   return len;
 }
 
+
+
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 
 }
+
+
 /* USER CODE END 0 */
 
 /**
@@ -99,7 +160,14 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
+  ring_buffer_init(&keyboard_ring_buffer, keyboard_buffer_memory, BUFFER_CAPACITY);
+  ssd1306_Init();
+  ssd1306_Fill(Black);
+  ssd1306_SetCursor(10,20);
+  ssd1306_WriteString("Starting...\r\n",Font_6x8,White);
+  ssd1306_UpdateScreen();
 
   /* USER CODE END 2 */
 
@@ -119,6 +187,33 @@ int main(void)
   * @brief System Clock Configuration
   * @retval None
   */
+
+
+/*
+ * Function to clear a specific line on the OLED screen.
+ *
+ * Purpose:
+ * This function is used to "delete" the contents of a specific line
+ * by writing spaces over it. This is useful when you want to update
+ * or remove text from a specific position on the OLED display.
+ *
+ * Parameters:
+ * - y_position: The vertical position (Y coordinate) of the line to clear.
+ *
+ * Functionality:
+ * - The function places the cursor at the start of the line.
+ * - It writes a string of spaces to overwrite any existing content on that line.
+ * - Finally, it updates the screen to reflect the changes.
+ */
+void clear_line(uint8_t y_position) {
+    // Place the cursor at the beginning of the line
+    ssd1306_SetCursor(10, y_position);
+    // Write a line of spaces to "delete" the line
+    ssd1306_WriteString("                ", Font_6x8, Black);  // Adjust the number of spaces according to the screen size
+    ssd1306_UpdateScreen();
+}
+
+
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
@@ -166,6 +261,54 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.Timing = 0x10909CEC;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -181,7 +324,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 256000;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -232,20 +375,20 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : COL_1_Pin */
-  GPIO_InitStruct.Pin = COL_1_Pin;
+  /*Configure GPIO pin : COLUMN_1_Pin */
+  GPIO_InitStruct.Pin = COLUMN_1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(COL_1_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(COLUMN_1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : COL_4_Pin */
-  GPIO_InitStruct.Pin = COL_4_Pin;
+  /*Configure GPIO pin : COLUMN_4_Pin */
+  GPIO_InitStruct.Pin = COLUMN_4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(COL_4_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(COLUMN_4_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : COL_2_Pin COL_3_Pin */
-  GPIO_InitStruct.Pin = COL_2_Pin|COL_3_Pin;
+  /*Configure GPIO pins : COLUMN_2_Pin COLUMN_3_Pin */
+  GPIO_InitStruct.Pin = COLUMN_2_Pin|COLUMN_3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -256,6 +399,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -295,4 +445,4 @@ void assert_failed(uint8_t *file, uint32_t line)
      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
 }
-#endif /* USE_FULL_ASSERT */
+#endif /* USE_FULL_ASSERT */
