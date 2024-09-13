@@ -84,7 +84,6 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
-void clear_line(uint8_t y_position);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -297,33 +296,6 @@ int main(void)
   * @brief System Clock Configuration
   * @retval None
   */
-
-
-/*
- * Function to clear a specific line on the OLED screen.
- *
- * Purpose:
- * This function is used to "delete" the contents of a specific line
- * by writing spaces over it. This is useful when you want to update
- * or remove text from a specific position on the OLED display.
- *
- * Parameters:
- * - y_position: The vertical position (Y coordinate) of the line to clear.
- *
- * Functionality:
- * - The function places the cursor at the start of the line.
- * - It writes a string of spaces to overwrite any existing content on that line.
- * - Finally, it updates the screen to reflect the changes.
- */
-void clear_line(uint8_t y_position) {
-    // Place the cursor at the beginning of the line
-    ssd1306_SetCursor(10, y_position);
-    // Write a line of spaces to "delete" the line
-    ssd1306_WriteString("                ", Font_6x8, Black);  // Adjust the number of spaces according to the screen size
-    ssd1306_UpdateScreen();
-}
-
-
 void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
@@ -434,7 +406,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 256000;
+  huart2.Init.BaudRate = 115200;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -485,20 +457,20 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : COLUMN_1_Pin */
-  GPIO_InitStruct.Pin = COLUMN_1_Pin;
+  /*Configure GPIO pin : COL_1_Pin */
+  GPIO_InitStruct.Pin = COL_1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(COLUMN_1_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(COL_1_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : COLUMN_4_Pin */
-  GPIO_InitStruct.Pin = COLUMN_4_Pin;
+  /*Configure GPIO pin : COL_4_Pin */
+  GPIO_InitStruct.Pin = COL_4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(COLUMN_4_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(COL_4_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : COLUMN_2_Pin COLUMN_3_Pin */
-  GPIO_InitStruct.Pin = COLUMN_2_Pin|COLUMN_3_Pin;
+  /*Configure GPIO pins : COL_2_Pin COL_3_Pin */
+  GPIO_InitStruct.Pin = COL_2_Pin|COL_3_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -509,13 +481,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
-
-  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -555,4 +520,4 @@ void assert_failed(uint8_t *file, uint32_t line)
      ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
 }
-#endif /* USE_FULL_ASSERT */
+#endif /* USE_FULL_ASSERT */
