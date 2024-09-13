@@ -124,7 +124,50 @@ int _write(int file, char *ptr, int len)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
+	uint8_t key_pressed = keypad_scan(GPIO_Pin);
 
+	    if (key_pressed != 0xFF) {
+	        // when '*' is pressed, the sequence is RESET
+	        if (key_pressed == '*') {
+	            ring_buffer_reset(&keyboard_ring_buffer);
+	            memset(display_buffer, 0, sizeof(display_buffer)); //clean actual buffer on the screen
+	            buffer_index = 0; // reset index on buffer
+
+	            ssd1306_Fill(Black);
+	            ssd1306_SetCursor(10, 20);
+	            ssd1306_WriteString("sequence restarted", Font_6x8, White);
+	            ssd1306_UpdateScreen();
+	            HAL_UART_Transmit(&huart2, (uint8_t*)"Sequence restarted\n\r", 22, 10);
+	            return;
+	        }
+
+	        // Write the key to the ring buffer
+	        if (key_pressed != '#') {
+	            ring_buffer_write(&keyboard_ring_buffer, key_pressed);
+
+	            // add chart to the buffer
+	            if (buffer_index < MAX_DISPLAY_CHARS) {
+	                display_buffer[buffer_index++] = key_pressed;
+	                display_buffer[buffer_index] = '\0'; // Null-terminar el buffer
+
+	                // clean screen and show buffer content on screen
+	                ssd1306_Fill(Black);
+	                ssd1306_SetCursor(10, 30);
+	                ssd1306_WriteString(display_buffer, Font_6x8, White);
+	                ssd1306_UpdateScreen();
+
+	                // send chart via UART
+	                HAL_UART_Transmit(&huart2, &key_pressed, 1, 10);
+	            }
+	            return;
+	        }
+
+	        // if is pressed '#', verify the password entered
+
+
+
+
+	    }
 }
 
 
