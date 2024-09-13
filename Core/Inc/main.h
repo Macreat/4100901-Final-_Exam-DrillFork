@@ -76,8 +76,11 @@ void Error_Handler(void);
 #define ROW_3_Pin GPIO_PIN_5
 #define ROW_3_GPIO_Port GPIOB
 
+
 /* USER CODE BEGIN Private defines */
 
+#define SYSTEM_LED_GPIO_Port GPIOA   // Puerto A, si es diferente cámbialo por el correcto
+#define SYSTEM_LED_Pin GPIO_PIN_5
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
