@@ -120,7 +120,25 @@ int _write(int file, char *ptr, int len)
   return len;
 }
 
-
+/*
+ * Function to handle external interrupt callbacks for GPIO pins (keypad input).
+ *
+ * Purpose:
+ * This function is called when a GPIO interrupt occurs. It scans the keypad for the pressed key,
+ * handles special cases ('*' to reset the sequence, '#' to validate the password), and updates
+ * the OLED display and UART based on the input.
+ *
+ * Parameters:
+ * - GPIO_Pin: The pin number where the interrupt was triggered.
+ *
+ * Functionality:
+ * - Detects the key pressed on the keypad.
+ * - If '*' is pressed, the input sequence is reset.
+ * - If a valid key is pressed, it is added to the ring buffer and displayed on the OLED.
+ * - If '#' is pressed, the entered sequence is validated against a predefined correct sequence.
+ * - The result of the validation (correct or incorrect) is displayed on the OLED and transmitted via UART.
+ * - The buffer is reset after validation.
+ */
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
@@ -162,10 +180,59 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 	            return;
 	        }
 
-	        // if is pressed '#', verify the password entered
+
+
+	        // proccoed when  '#' is pressed , we verify the password entered
 
 
 
+	        uint8_t byte2 = 0;
+	        uint8_t id_incorrect2 = 0;
+	        uint8_t my_id2[] = "1004191436";  // correct sequence
+
+	        // Read from buffer and compare with correct key
+	        for (uint8_t idx2 = 0; idx2 < sizeof(my_id2) - 1; idx2++) {
+	            if (ring_buffer_read(&keyboard_ring_buffer, &byte2) != 0) {
+	                if (byte2 != my_id2[idx2]) {
+	                    id_incorrect2 = 1;  // Mark as incorrect if no match
+
+
+	                    break;
+	                }
+	            } else {
+	                id_incorrect2 = 1;  // if there is no space in buffer
+	                break;
+	            }
+	        }
+
+	        HAL_UART_Transmit(&huart2, (uint8_t*)"\n", 1, 10);
+
+	        if (!id_incorrect2) {
+	            // success
+	            ssd1306_Fill(Black);
+	            ssd1306_SetCursor(10, 20);
+	            ssd1306_WriteString("correct sequence", Font_6x8, White);
+	            ssd1306_UpdateScreen();
+	            HAL_UART_Transmit(&huart2, (uint8_t*)"correct sequence\n\r", 21, 10);
+	            HAL_UART_Transmit(&huart2, (uint8_t*)"starting...\n\r", 14, 10);
+
+
+	        } else {
+	            //  error
+	            ssd1306_Fill(Black);
+	            ssd1306_SetCursor(10, 20);
+	            ssd1306_WriteString("error ", Font_6x8, White);
+	            ssd1306_UpdateScreen();
+	            HAL_UART_Transmit(&huart2, (uint8_t*)" incorrect sequence \n\r", 12, 10);
+
+	        }
+
+	        // reset buffer after validation
+	        ring_buffer_reset(&keyboard_ring_buffer);
+	        memset(display_buffer, 0, sizeof(display_buffer)); // clean buffer on screen
+	        buffer_index = 0; // reset index buffer
+	        cursor_x = 10;  //Resets the horizontal cursor position
+	        cursor_y = 30;  // Restarts the vertical position of the course
 
 	    }
 }
